@@ -26,7 +26,7 @@ RUN set -euo pipefail; \
       /tmp/sbsigntools; \
     test "$(git -C /tmp/sbsigntools rev-parse HEAD)" = "${SBSIGNTOOLS_COMMIT}"; \
     cd /tmp/sbsigntools; \
-    patch --batch --fuzz=0 -p1 < /tmp/sbsigntools-gcc16.patch; \
+    git apply --unidiff-zero /tmp/sbsigntools-gcc16.patch; \
     ./autogen.sh; \
     ./configure --prefix=/usr/local; \
     make -C lib/ccan; \
