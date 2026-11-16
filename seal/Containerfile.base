@@ -11,6 +11,7 @@ RUN dnf install -y autoconf automake binutils-devel gcc git \
       libuuid-devel make openssl-devel pkgconf-pkg-config && \
     dnf clean all
 COPY seal/sbsigntools-gcc16.patch /tmp/sbsigntools-gcc16.patch
+COPY seal/sbsigntools-openssl-engine.patch /tmp/sbsigntools-openssl-engine.patch
 RUN set -euo pipefail; \
     git clone --depth 1 --branch 3.0.18 \
       https://git.code.sf.net/p/gnu-efi/code /tmp/gnu-efi; \
@@ -27,6 +28,7 @@ RUN set -euo pipefail; \
     test "$(git -C /tmp/sbsigntools rev-parse HEAD)" = "${SBSIGNTOOLS_COMMIT}"; \
     cd /tmp/sbsigntools; \
     git apply --unidiff-zero /tmp/sbsigntools-gcc16.patch; \
+    git apply --unidiff-zero /tmp/sbsigntools-openssl-engine.patch; \
     ./autogen.sh; \
     ./configure --prefix=/usr/local; \
     make -C lib/ccan; \

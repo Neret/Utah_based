@@ -1,0 +1,20 @@
+--- a/src/fileio.c
++++ b/src/fileio.c
+@@ -41,0 +42 @@
++#if __has_include(<openssl/engine.h>)
+@@ -42,0 +44,4 @@
++#define HAVE_OPENSSL_ENGINE 1
++#else
++#define HAVE_OPENSSL_ENGINE 0
++#endif
+@@ -50,0 +56 @@
++#if HAVE_OPENSSL_ENGINE
+@@ -98,0 +105,8 @@
++#else
++EVP_PKEY *fileio_read_engine_key(const char *engine, const char *filename)
++{
++	fprintf(stderr, "OpenSSL ENGINE support unavailable in this build; cannot use engine '%s'\n", engine);
++	(void)filename;
++	return NULL;
++}
++#endif
