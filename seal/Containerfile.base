@@ -23,15 +23,15 @@ metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-45&arch=x86_64\n
 gpgcheck=1\n\
 gpgkey=https://src.fedoraproject.org/rpms/fedora-repos/raw/f45/f/RPM-GPG-KEY-fedora-45-primary\n\
 priority=200\n\
-includepkgs=sbsigntools*\n\
+includepkgs=sbsigntools*,openssl-libs*\n\
 [updates45-sbsigntools]\n\
 name=Fedora 45 updates sbsigntools\n\
 metalink=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f45&arch=x86_64\n\
 gpgcheck=1\n\
 gpgkey=https://src.fedoraproject.org/rpms/fedora-repos/raw/f45/f/RPM-GPG-KEY-fedora-45-primary\n\
 priority=200\n\
-includepkgs=sbsigntools*\n' > /etc/yum.repos.d/sbsigntools.repo; \
-    dnf install -y coreutils sbsigntools; \
+includepkgs=sbsigntools*,openssl-libs*\n' > /etc/yum.repos.d/sbsigntools.repo; \
+    dnf install -y sbsigntools; \
     xargs -r dnf install -y < /tmp/thinkpad-packages.txt; \
     rm -f /etc/yum.repos.d/utah-packages.repo; \
     rm -f /etc/yum.repos.d/sbsigntools.repo; \
