@@ -1,0 +1,183 @@
+name: Build Sealed Image
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Build Utah Base and Custom OS
+    types:
+      - completed
+    branches:
+      - main
+
+concurrency:
+  group: build-sealed
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/neret/hummingbird-sealed-os
+
+jobs:
+  seal:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache
+
+      - name: Set image tag
+        run: echo "TAG=sealed-${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | sudo podman login ghcr.io \
+            --username "$GITHUB_ACTOR" \
+            --password-stdin
+
+      - name: Write Secure Boot key material
+        env:
+          SB_KEY: ${{ secrets.SECUREBOOT_KEY }}
+          SB_CERT: ${{ secrets.SECUREBOOT_CERT }}
+        run: |
+          set -euo pipefail
+          test -n "$SB_KEY" && test -n "$SB_CERT"
+          umask 077
+          printf '%s\n' "$SB_KEY" > "$RUNNER_TEMP/mok.key"
+          printf '%s\n' "$SB_CERT" > "$RUNNER_TEMP/mok.crt"
+
+      - name: Build unsealed image
+        run: |
+          set -euo pipefail
+          sudo podman build --pull=always \
+            -f seal/Containerfile.unsealed \
+            -t "localhost/unsealed:${TAG}" \
+            --secret "id=key,src=${RUNNER_TEMP}/mok.key" \
+            --secret "id=cert,src=${RUNNER_TEMP}/mok.crt" \
+            .
+
+      - name: Build slim image for composefs digest calculation
+        run: |
+          set -euo pipefail
+          sudo podman build --pull=never \
+            -f seal/Containerfile.seal --target slim \
+            --build-arg "UNSEALED=localhost/unsealed:${TAG}" \
+            -t "localhost/slim:${TAG}" \
+            .
+
+      - name: Compute composefs digests
+        run: |
+          set -euo pipefail
+          for version in v1 v2; do
+            digest="$(sudo podman run --rm --privileged --pid=host \
+              --security-opt label=disable \
+              -v /var/lib/containers:/var/lib/containers \
+              "localhost/slim:${TAG}" \
+              bootc container compute-composefs-digest-from-storage \
+              --erofs-version "$version" "localhost/slim:${TAG}" | tail -n1)"
+            [[ "$digest" =~ ^[0-9a-f]{128}$ ]] || {
+              echo "::error::Invalid composefs ${version} digest: ${digest}"
+              exit 1
+            }
+            variable="COMPOSEFS_${version^^}"
+            printf '%s=%s\n' "$variable" "$digest" >> "$GITHUB_ENV"
+            echo "composefs ${version}: ${digest}"
+          done
+
+      - name: Build sealed image with signed UKI
+        run: |
+          set -euo pipefail
+          sudo podman build --pull=missing \
+            -f seal/Containerfile.seal --target final \
+            --build-arg "UNSEALED=localhost/unsealed:${TAG}" \
+            --build-arg "COMPOSEFS_V1=${COMPOSEFS_V1}" \
+            --build-arg "COMPOSEFS_V2=${COMPOSEFS_V2}" \
+            --secret "id=key,src=${RUNNER_TEMP}/mok.key" \
+            --secret "id=cert,src=${RUNNER_TEMP}/mok.crt" \
+            -t "${IMAGE}:${TAG}" \
+            .
+
+      - name: Verify final image composefs digests
+        run: |
+          set -euo pipefail
+          for version in v1 v2; do
+            digest="$(sudo podman run --rm --privileged --pid=host \
+              --security-opt label=disable \
+              -v /var/lib/containers:/var/lib/containers \
+              "${IMAGE}:${TAG}" \
+              bootc container compute-composefs-digest-from-storage \
+              --erofs-version "$version" "${IMAGE}:${TAG}" | tail -n1)"
+            if [[ "$version" == v1 ]]; then
+              expected="$COMPOSEFS_V1"
+            else
+              expected="$COMPOSEFS_V2"
+            fi
+            echo "composefs ${version}: final=${digest}, UKI=${expected}"
+            [[ "$digest" == "$expected" ]] || {
+              echo "::error::Final image composefs ${version} digest does not match the UKI"
+              exit 1
+            }
+          done
+
+      - name: Verify Secure Boot signatures
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sbsigntool
+          sudo podman run --rm "${IMAGE}:${TAG}" \
+            sh -c 'cat /boot/EFI/Linux/*.efi' > "$RUNNER_TEMP/uki.efi"
+          sudo podman run --rm "${IMAGE}:${TAG}" \
+            cat /usr/lib/systemd/boot/efi/systemd-bootx64.efi \
+            > "$RUNNER_TEMP/systemd-bootx64.efi"
+          sbverify --cert "$RUNNER_TEMP/mok.crt" "$RUNNER_TEMP/uki.efi"
+          sbverify --cert "$RUNNER_TEMP/mok.crt" "$RUNNER_TEMP/systemd-bootx64.efi"
+          {
+            echo "### ${IMAGE}:${TAG}"
+            echo "- Certificate: $(openssl x509 -in "$RUNNER_TEMP/mok.crt" -noout -fingerprint -sha256)"
+            echo "- UKI size: $(du -h "$RUNNER_TEMP/uki.efi" | cut -f1)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rehearse bootc install
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /mnt/rehearsal
+          sudo truncate -s 24G /mnt/rehearsal/disk.raw
+          sudo podman run --rm --privileged --pid=host \
+            --security-opt label=disable \
+            -v /dev:/dev \
+            -v /var/lib/containers:/var/lib/containers \
+            -v /mnt/rehearsal:/data \
+            "${IMAGE}:${TAG}" \
+            bootc install to-disk --via-loopback --composefs-backend \
+            --bootloader systemd --filesystem ext4 /data/disk.raw
+
+      - name: Publish sealed image
+        run: |
+          set -euo pipefail
+          sudo podman push "${IMAGE}:${TAG}"
+          sudo podman tag "${IMAGE}:${TAG}" "${IMAGE}:latest"
+          sudo podman push "${IMAGE}:latest"
+
+      - name: Remove Secure Boot key material
+        if: always()
+        run: |
+          set -euo pipefail
+          for file in "$RUNNER_TEMP/mok.key" "$RUNNER_TEMP/mok.crt"; do
+            if [[ -f "$file" ]]; then
+              shred -u -- "$file"
+            fi
+          done

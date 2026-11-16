@@ -14,11 +14,16 @@ systemd-boot.
 - `sbsigntools` è l'unica eccezione: arriva dai repository Fedora 45 ufficiali,
   con verifica GPG, perché `sealed-sync` ne usa `sbattach` e `sbverify`.
 - `.github/workflows/build.yml` verifica firma Cosign e attestazione GitHub
-  del repository Utah prima di creare la base preparata.
+  del repository Utah prima di creare la base preparata e l'immagine
+  personalizzata non sigillata.
 - `recipes/recipe.yml` applica le personalizzazioni ThinkPad e i servizi
   dell'immagine.
 - `.github/workflows/build-sealed.yml` conserva il flusso composefs, UKI,
   Secure Boot e systemd-boot.
+
+Per eseguire le build, configurare nei secrets del repository `SIGNING_SECRET`,
+`SECUREBOOT_KEY` e `SECUREBOOT_CERT`. Le immagini vengono pubblicate su GHCR
+usando `GITHUB_TOKEN`; le chiavi private non devono essere committate.
 
 Il repository pacchetti upstream è
 [projectbluefin/utah-packages](https://github.com/projectbluefin/utah-packages).
