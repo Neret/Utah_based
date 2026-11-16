@@ -15,12 +15,12 @@ RUN set -euo pipefail; \
     git clone --depth 1 --branch 3.0.18 \
       https://git.code.sf.net/p/gnu-efi/code /tmp/gnu-efi; \
     test "$(git -C /tmp/gnu-efi rev-parse HEAD)" = "${GNU_EFI_COMMIT}"; \
-    make -C /tmp/gnu-efi PREFIX=/usr; \
-    make -C /tmp/gnu-efi PREFIX=/usr \
-      DESTDIR=/tmp/gnu-efi-install install; \
-    install -d /usr/include /usr/lib; \
-    cp -a /tmp/gnu-efi-install/usr/include/efi /usr/include/; \
-    cp -a /tmp/gnu-efi-install/usr/lib/. /usr/lib/; \
+    make -C /tmp/gnu-efi PREFIX=/usr gnuefi; \
+    install -d /usr/include/efi /usr/lib; \
+    cp -a /tmp/gnu-efi/inc/. /usr/include/efi/; \
+    install -m 0644 \
+      /tmp/gnu-efi/x86_64/gnuefi/crt0-efi-x86_64.o \
+      /usr/lib/crt0-efi-x86_64.o; \
     git clone --depth 1 --branch master --recurse-submodules \
       https://git.kernel.org/pub/scm/linux/kernel/git/jejb/sbsigntools.git \
       /tmp/sbsigntools; \
