@@ -50,7 +50,9 @@ jobs:
           [[ "$image" =~ ^ghcr\.io/projectbluefin/utah-packages@sha256:[0-9a-f]{64}$ ]] \
             || { echo "::error::Utah image must be pinned by digest"; exit 1; }
 
-          cosign verify --key cosign.pub "$image"
+          cosign verify "$image" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github[.]com/projectbluefin/utah-packages/[.]github/workflows/(rebuild-rpms|publish-repository)[.]yml@refs/heads/main$'
           gh attestation verify "oci://${image}" \
             --repo projectbluefin/utah-packages
 
