@@ -1,0 +1,9 @@
+--- a/src/image.c
++++ b/src/image.c
+@@ -515 +515 @@
+-	int rc, i, n;
++	int rc, i;
+@@ -521 +520,0 @@
+-	n = 0;
+@@ -525 +523,0 @@
+-		n += region->size;

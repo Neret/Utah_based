@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1
 ARG UNSEALED=ghcr.io/neret/hummingbird-sealed-os:unsealed-latest
-ARG TOOLS=quay.io/fedora/fedora:45
 
 FROM ${UNSEALED} AS base
 
@@ -12,8 +11,8 @@ RUN set -euo pipefail; \
     test -d "/usr/lib/modules/${kver}"; \
     rm -f "/usr/lib/modules/${kver}/vmlinuz" "/usr/lib/modules/${kver}/initramfs.img"
 
-FROM ${TOOLS} AS buildroot
-RUN dnf install -y systemd-ukify systemd-udev sbsigntools openssl \
+FROM base AS buildroot
+RUN dnf install -y systemd-ukify systemd-udev openssl \
       systemd-boot-unsigned && dnf clean all
 
 FROM buildroot AS kernel

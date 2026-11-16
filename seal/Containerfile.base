@@ -1,11 +1,45 @@
 # syntax=docker/dockerfile:1
 ARG HUMMINGBIRD_BASE_IMAGE=quay.io/hummingbird-community/os-minimal:latest@sha256:a98c8cf505b1fdde497fa78af26c2d7439f97071cc79cb4e35fc104d6bda4a79
 ARG UTAH_PACKAGES_IMAGE=ghcr.io/projectbluefin/utah-packages@sha256:0b0664cb8591ccf8f2b42e7bcb1cb0f27d5da91eaf450dfa64c7982730be38c1
+ARG SBSIGNTOOLS_COMMIT=db731f0c4dd75e112e2abdfbe9443065742e58c3
+
+FROM ${HUMMINGBIRD_BASE_IMAGE} AS sbsigntools-build
+ARG SBSIGNTOOLS_COMMIT
+RUN dnf install -y autoconf automake binutils-devel gcc gnu-efi-devel git \
+      libuuid-devel make openssl-devel pkgconf-pkg-config && \
+    dnf clean all
+COPY seal/sbsigntools-gcc16.patch /tmp/sbsigntools-gcc16.patch
+RUN set -euo pipefail; \
+    git clone --depth 1 --branch master --recurse-submodules \
+      https://git.kernel.org/pub/scm/linux/kernel/git/jejb/sbsigntools.git \
+      /tmp/sbsigntools; \
+    test "$(git -C /tmp/sbsigntools rev-parse HEAD)" = "${SBSIGNTOOLS_COMMIT}"; \
+    cd /tmp/sbsigntools; \
+    patch --batch --fuzz=0 -p1 < /tmp/sbsigntools-gcc16.patch; \
+    efi_crt="$(find /usr/lib /usr/lib64 -type f \
+      \( -path '*/gnuefi/x86_64/crt0.o' -o -path '*/gnuefi/x64/crt0.o' \) \
+      -print -quit)"; \
+    if [[ -n "${efi_crt}" ]]; then \
+      mkdir -p /usr/lib/gnuefi; \
+      ln -sfn "${efi_crt}" /usr/lib/gnuefi/crt0-efi-x86_64.o; \
+    fi; \
+    ./autogen.sh; \
+    ./configure --prefix=/usr/local; \
+    make -C lib/ccan; \
+    make -C src sbsign sbverify sbattach; \
+    install -D -m 0755 src/sbsign /out/usr/local/bin/sbsign; \
+    install -D -m 0755 src/sbverify /out/usr/local/bin/sbverify; \
+    install -D -m 0755 src/sbattach /out/usr/local/bin/sbattach; \
+    install -D -m 0644 COPYING \
+      /out/usr/local/share/licenses/sbsigntools/COPYING
 
 FROM ${UTAH_PACKAGES_IMAGE} AS utah-packages
 
 FROM ${HUMMINGBIRD_BASE_IMAGE}
 COPY recipes/packages.txt /tmp/thinkpad-packages.txt
+COPY --from=sbsigntools-build /out/usr/local/bin/ /usr/local/bin/
+COPY --from=sbsigntools-build /out/usr/local/share/licenses/sbsigntools/ \
+  /usr/local/share/licenses/sbsigntools/
 
 RUN --mount=type=bind,from=utah-packages,source=/repository,target=/mnt/utah-packages,ro \
     set -euo pipefail; \
@@ -17,23 +51,7 @@ gpgcheck=0\n\
 repo_gpgcheck=0\n\
 priority=1\n\
 excludepkgs=grub2*\n' > /etc/yum.repos.d/utah-packages.repo; \
-    printf '[fedora45-sbsigntools]\n\
-name=Fedora 45 sbsigntools\n\
-metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-45&arch=x86_64\n\
-gpgcheck=1\n\
-gpgkey=https://src.fedoraproject.org/rpms/fedora-repos/raw/f45/f/RPM-GPG-KEY-fedora-45-primary\n\
-priority=200\n\
-includepkgs=sbsigntools*,openssl-libs*\n\
-[updates45-sbsigntools]\n\
-name=Fedora 45 updates sbsigntools\n\
-metalink=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f45&arch=x86_64\n\
-gpgcheck=1\n\
-gpgkey=https://src.fedoraproject.org/rpms/fedora-repos/raw/f45/f/RPM-GPG-KEY-fedora-45-primary\n\
-priority=200\n\
-includepkgs=sbsigntools*,openssl-libs*\n' > /etc/yum.repos.d/sbsigntools.repo; \
-    dnf install -y sbsigntools; \
     xargs -r dnf install -y < /tmp/thinkpad-packages.txt; \
     rm -f /etc/yum.repos.d/utah-packages.repo; \
-    rm -f /etc/yum.repos.d/sbsigntools.repo; \
     dnf clean all; \
     rm -rf /var/cache/dnf /var/cache/libdnf5 /var/lib/dnf/repos /tmp/thinkpad-packages.txt
