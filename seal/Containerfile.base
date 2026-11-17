@@ -43,19 +43,19 @@ RUN set -euo pipefail; \
     ./configure --prefix=/usr/local; \
     make -C lib/ccan; \
     make -C src sbsign sbverify sbattach; \
-    install -D -m 0755 src/sbsign /out/usr/local/bin/sbsign; \
-    install -D -m 0755 src/sbverify /out/usr/local/bin/sbverify; \
-    install -D -m 0755 src/sbattach /out/usr/local/bin/sbattach; \
+    install -D -m 0755 src/sbsign /out/usr/bin/sbsign; \
+    install -D -m 0755 src/sbverify /out/usr/bin/sbverify; \
+    install -D -m 0755 src/sbattach /out/usr/bin/sbattach; \
     install -D -m 0644 COPYING \
-      /out/usr/local/share/licenses/sbsigntools/COPYING
+      /out/usr/share/licenses/sbsigntools/COPYING
 
 FROM ${UTAH_PACKAGES_IMAGE} AS utah-packages
 
 FROM ${HUMMINGBIRD_BASE_IMAGE}
 COPY recipes/packages.txt /tmp/thinkpad-packages.txt
-COPY --from=sbsigntools-build /out/usr/local/bin/ /usr/local/bin/
-COPY --from=sbsigntools-build /out/usr/local/share/licenses/sbsigntools/ \
-  /usr/local/share/licenses/sbsigntools/
+COPY --from=sbsigntools-build /out/usr/bin/ /usr/bin/
+COPY --from=sbsigntools-build /out/usr/share/licenses/sbsigntools/ \
+  /usr/share/licenses/sbsigntools/
 
 RUN --mount=type=bind,from=utah-packages,source=/repository,target=/mnt/utah-packages,ro \
     set -euo pipefail; \

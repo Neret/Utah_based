@@ -5,8 +5,8 @@ ARG SIGNING_TOOLS_BASE=ghcr.io/neret/hummingbird-base-prep:latest
 FROM ${SIGNING_TOOLS_BASE} AS signing-tools
 
 FROM ${BASE} AS builder
-COPY --from=signing-tools /usr/local/bin/sbsign /usr/local/bin/sbverify \
-    /usr/local/bin/sbattach /usr/local/bin/
+COPY --from=signing-tools /usr/bin/sbsign /usr/bin/sbverify \
+    /usr/bin/sbattach /usr/bin/
 
 # Rimuove bootupd (non serve con systemd-boot)
 RUN dnf remove -y bootupd || true
@@ -15,7 +15,7 @@ RUN dnf remove -y bootupd || true
 RUN --mount=type=secret,id=key \
     --mount=type=secret,id=cert <<'EOF'
 set -euo pipefail
-/usr/local/bin/sbsign --key /run/secrets/key --cert /run/secrets/cert \
+/usr/bin/sbsign --key /run/secrets/key --cert /run/secrets/cert \
   --output /tmp/systemd-bootx64.efi \
   /usr/lib/systemd/boot/efi/systemd-bootx64.efi
 install -m 0644 /tmp/systemd-bootx64.efi \
