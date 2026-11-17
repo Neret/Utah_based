@@ -42,7 +42,7 @@ PY
 
 cp /tmp/seal-rpms/python3-pefile.spec /tmp/seal-rpms/python3-zstandard.spec \
   "$topdir/SPECS/"
-python_sitelib="$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
+python_sitelib="$(python3 -c 'import sysconfig; print(sysconfig.get_path("purelib", scheme="posix_prefix"))')"
 rpmbuild --define "_topdir $topdir" --define "_python_sitelib $python_sitelib" \
   -ba "$topdir/SPECS/python3-pefile.spec"
 rpmbuild --define "_topdir $topdir" --define "_python_sitelib $python_sitelib" \
