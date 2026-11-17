@@ -5,7 +5,8 @@ ARG SIGNING_TOOLS_BASE=ghcr.io/neret/hummingbird-base-prep:latest
 FROM ${SIGNING_TOOLS_BASE} AS signing-tools
 
 FROM ${BASE} AS builder
-COPY --from=signing-tools /usr/local/bin/sbsign /usr/local/bin/sbsign
+COPY --from=signing-tools /usr/local/bin/sbsign /usr/local/bin/sbverify \
+    /usr/local/bin/sbattach /usr/local/bin/
 
 # Rimuove bootupd (non serve con systemd-boot)
 RUN dnf remove -y bootupd || true
