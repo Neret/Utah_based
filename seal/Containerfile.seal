@@ -11,9 +11,20 @@ RUN set -euo pipefail; \
     test -d "/usr/lib/modules/${kver}"; \
     rm -f "/usr/lib/modules/${kver}/vmlinuz" "/usr/lib/modules/${kver}/initramfs.img"
 
+FROM base AS python-rpms
+RUN dnf install -y gcc libzstd-devel pkgconf-pkg-config python3-devel \
+      python3-packaging python3-setuptools rpm-build && dnf clean all
+COPY seal/rpms/ /tmp/seal-rpms/
+RUN bash /tmp/seal-rpms/build-rpms.sh
+
 FROM base AS buildroot
-RUN dnf install -y systemd-ukify systemd-udev openssl \
-      systemd-boot-unsigned && dnf clean all
+RUN --mount=type=bind,from=python-rpms,source=/out,target=/tmp/python-rpms,ro <<'EOF'
+set -euo pipefail
+dnf install -y /tmp/python-rpms/*.rpm systemd-ukify systemd-udev \
+  openssl systemd-boot-unsigned
+python3 -c 'import pefile, zstandard'
+dnf clean all
+EOF
 
 FROM buildroot AS kernel
 ARG COMPOSEFS_V1
