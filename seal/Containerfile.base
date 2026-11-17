@@ -59,5 +59,6 @@ priority=1\n\
 excludepkgs=grub2*\n' > /etc/yum.repos.d/utah-packages.repo; \
     xargs -r dnf install -y < /tmp/thinkpad-packages.txt; \
     rm -f /etc/yum.repos.d/utah-packages.repo; \
+    dnf swap -y coreutils-single coreutils; \
     dnf clean all; \
     rm -rf /var/cache/dnf /var/cache/libdnf5 /var/lib/dnf/repos /tmp/thinkpad-packages.txt
