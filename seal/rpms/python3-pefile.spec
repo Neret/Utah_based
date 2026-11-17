@@ -6,8 +6,7 @@ License:        MIT
 URL:            https://github.com/erocarrera/pefile
 Source0:        pefile-%{version}.tar.gz
 BuildArch:      noarch
-BuildRequires:  python3-devel
-BuildRequires:  python3-setuptools
+AutoReqProv:    no
 Requires:       python3
 Provides:       python3dist(pefile) = %{version}
 
@@ -17,16 +16,15 @@ Pure Python module for parsing Portable Executable files.
 %prep
 %setup -q -n pefile-%{version}
 
-%build
-%{__python3} setup.py build
-
 %install
-%{__python3} setup.py install --root=%{buildroot} --prefix=%{_prefix} \
-  --single-version-externally-managed --record=installed-files.txt
+install -d "%{buildroot}%{_python_sitelib}/ordlookup"
+install -m 0644 pefile.py peutils.py "%{buildroot}%{_python_sitelib}/"
+install -m 0644 ordlookup/*.py "%{buildroot}%{_python_sitelib}/ordlookup/"
+install -D -m 0644 LICENSE \
+  "%{buildroot}%{_licensedir}/%{name}/LICENSE"
 
 %files
-%license LICENSE
-%{python3_sitelib}/ordlookup/
-%{python3_sitelib}/pefile.py
-%{python3_sitelib}/peutils.py
-%{python3_sitelib}/pefile*.egg-info/
+%license %{_licensedir}/%{name}/LICENSE
+%{_python_sitelib}/ordlookup/
+%{_python_sitelib}/pefile.py
+%{_python_sitelib}/peutils.py

@@ -12,8 +12,8 @@ RUN set -euo pipefail; \
     rm -f "/usr/lib/modules/${kver}/vmlinuz" "/usr/lib/modules/${kver}/initramfs.img"
 
 FROM base AS python-rpms
-RUN dnf install -y gcc libzstd-devel pkgconf-pkg-config python3-devel \
-      python3-packaging python3-setuptools rpm-build && dnf clean all
+# Hummingbird's python3-devel conditionally requires an unavailable RPM generator.
+RUN dnf install -y python3 rpm-build && dnf clean all
 COPY seal/rpms/ /tmp/seal-rpms/
 RUN bash /tmp/seal-rpms/build-rpms.sh
 
