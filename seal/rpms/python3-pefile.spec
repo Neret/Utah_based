@@ -26,5 +26,6 @@ install -D -m 0644 LICENSE \
 %files
 %license %{_licensedir}/%{name}/LICENSE
 %{_python_sitelib}/ordlookup/
+%{_python_sitelib}/__pycache__/
 %{_python_sitelib}/pefile.py
 %{_python_sitelib}/peutils.py
