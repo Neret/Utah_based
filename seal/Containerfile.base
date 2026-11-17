@@ -22,9 +22,19 @@ RUN set -euo pipefail; \
     install -m 0644 \
       /tmp/gnu-efi/x86_64/gnuefi/crt0-efi-x86_64.o \
       /usr/lib/crt0-efi-x86_64.o; \
-    git clone --depth 1 --branch master --recurse-submodules \
-      https://git.kernel.org/pub/scm/linux/kernel/git/jejb/sbsigntools.git \
-      /tmp/sbsigntools; \
+    for attempt in 1 2 3; do \
+      if git clone --depth 1 --branch master --recurse-submodules \
+        https://git.kernel.org/pub/scm/linux/kernel/git/jejb/sbsigntools.git \
+        /tmp/sbsigntools; then \
+        break; \
+      fi; \
+      rm -rf /tmp/sbsigntools; \
+      if [ "$attempt" -eq 3 ]; then \
+        echo "Failed to clone sbsigntools after 3 attempts" >&2; \
+        exit 1; \
+      fi; \
+      sleep $((attempt * 10)); \
+    done; \
     test "$(git -C /tmp/sbsigntools rev-parse HEAD)" = "${SBSIGNTOOLS_COMMIT}"; \
     cd /tmp/sbsigntools; \
     git apply --unidiff-zero /tmp/sbsigntools-gcc16.patch; \
