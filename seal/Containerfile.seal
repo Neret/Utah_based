@@ -18,6 +18,8 @@ COPY seal/rpms/ /tmp/seal-rpms/
 RUN bash /tmp/seal-rpms/build-rpms.sh
 
 FROM base AS buildroot
+# The Python packages are stored in /usr, outside bootc's mutable /usr/local.
+ENV PYTHONPATH=/usr/lib/python3.14/site-packages
 RUN --mount=type=bind,from=python-rpms,source=/out,target=/tmp/python-rpms,ro <<'EOF'
 set -euo pipefail
 dnf install -y /tmp/python-rpms/*.rpm systemd-ukify systemd-udev \
